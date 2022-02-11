@@ -7,6 +7,8 @@ This is a simple implementation of [Ethereum's ERC20](https://eips.ethereum.org/
 
 ## Change log
 ```
+v0.2:
+    + Added simple stacking implementation
 v0.1:
     + First commit.
 ```
