@@ -35,7 +35,13 @@ interface ERC20x {
 	event Approval(address indexed _owner, address indexed _spender, uint256 _oldValue, uint256 _value);
 }
 
-contract Token is ERC20x {
+interface Stacking {
+	function stack(uint256 _ammount) external;
+	function reedem(uint256 _ammount) external;
+	function stack_balance(address _owner) external view returns (uint256);
+}
+
+contract Token is ERC20x, Stacking {
 	mapping(address => uint256) balances;
 	mapping(address => mapping(address => uint256)) transactions;
 
@@ -50,18 +56,53 @@ contract Token is ERC20x {
         _;
     }
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _supply, address _owner) {
-		m_name = _name;
-		m_symbol = _symbol;
-		m_decimals = _decimals;
-		m_supply = _supply;
-        m_owner = _owner;
+	//constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _supply, address _owner) {
+	constructor() {
+		m_name = "TestToken";
+		m_symbol = "TTK";
+		m_decimals = 8;
+		m_supply = 1_000_000;
+        m_owner = 0x3D9942E4E74c129b1d33aBBB2C28d5CC2a754538;
 	}
 
 	function name() public view returns (string memory) { return m_name; }
 	function symbol() public view returns (string memory) { return m_symbol; }
 	function decimals() public view returns (uint8) { return m_decimals; }
 	function totalSupply() public view returns (uint256) { return m_supply; }
+
+	/* Stacking implementation */
+	uint constant stack_const = 2;
+	struct Stack {
+		uint256 timestamp;
+		uint256 stack_balance;
+	}
+	mapping(address => Stack) stacks;
+	uint256 stacking_time = 5 seconds;
+	function stack(uint256 _ammount) override external {
+		require(_ammount > 0, "Can't stack <0");
+		require(_ammount <= stacks[msg.sender].stack_balance, "Can't stack more than you have.");
+		balances[msg.sender] -= _ammount; // UNDERFLOW! BECAREFUL
+		stacks[msg.sender] = Stack(block.timestamp, _ammount);
+	}
+
+	function reedem(uint256 _ammount) override external {
+		require(_ammount > 0, "Can't reedem <0");
+		require(_ammount <= stacks[msg.sender].stack_balance, "Can't reedem more than you have.");
+		require(stacks[msg.sender].stack_balance > 0, "Your stack balance must be bigger than 0");
+		require(block.timestamp > stacks[msg.sender].timestamp, "You can't reedem your stack yet");
+
+		balances[msg.sender] += _ammount * stack_const;
+		stacks[msg.sender].stack_balance -= _ammount; /* UNDERFLOW! BECAREFUL */
+
+		if (stacks[msg.sender].stack_balance == 0)
+			stacks[msg.sender].timestamp = block.timestamp;
+	}
+
+	function stack_balance(address _owner) override external view returns (uint256) {
+		require(_owner != address(0), "Missing argument!");
+		return stacks[_owner].stack_balance;
+	}
+	/* ======================= */
 
 	function balanceOf(address _owner) override external view returns (uint256 balance) {
 		return balances[_owner];
